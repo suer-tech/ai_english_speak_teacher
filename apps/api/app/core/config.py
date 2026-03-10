@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     salute_speech_auth_url: str = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
     salute_speech_scope: str = "SALUTE_SPEECH_PERS"
     salute_speech_base_url: str = "https://smartspeech.sber.ru/rest/v1"
+    salute_speech_grpc_host: str = "smartspeech.sber.ru"
     salute_speech_default_voice: str = "Kin_24000"
 
 

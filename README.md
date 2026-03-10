@@ -1,95 +1,116 @@
-# SpeakAI MVP
+# SpeakAI
 
-Mobile-first web app for spoken English practice with an AI tutor.
+Веб-приложение для разговорной практики английского с AI-преподавателем.
 
-## Goal
+Приложение позволяет:
 
-Build an MVP that helps users practice conversational English through live-ish voice interaction:
+- зарегистрироваться и войти в аккаунт
+- выбрать настройки преподавателя
+- говорить в микрофон
+- получать голосовой ответ от AI
 
-- `SaluteSpeech` for speech-to-text and text-to-speech
-- `OpenRouter` for tutor intelligence and feedback generation
-- `FastAPI` backend for auth, settings, session orchestration, and provider integration
-- `Next.js` frontend for a mobile-first speaking experience
-- `SQLite` for users and tutor settings during MVP
+Текущий стек:
 
-## Current MVP Scope
+- `Vite` + `React` — frontend
+- `FastAPI` — backend
+- `SQLite` — локальная база
+- `SaluteSpeech` — распознавание и синтез речи
+- `OpenRouter` — генерация ответов преподавателя
 
-- User registration and login
-- Tutor selection with saved preferences
-- Speaking session screen optimized for mobile
-- Browser audio capture UX
-- Backend session APIs
-- OpenRouter-powered tutor response generation
-- SaluteSpeech provider interface stubs ready for integration
-- Russian UI and Russian learning feedback
+## Структура проекта
 
-## Current Status
+- `apps/frontend` — frontend
+- `apps/api` — backend
+- `docs` — документация
+- `scripts` — скрипты запуска
 
-- `apps/web` is scaffolded and builds successfully
-- `apps/api` contains the FastAPI project skeleton and provider abstractions
-- frontend currently falls back to local demo responses if backend is unavailable
-- frontend now supports real register/login and token persistence
-- backend includes real `SaluteSpeech` wiring for token exchange, STT, and TTS
+## Что нужно для запуска
 
-## Not In MVP Yet
+- `Python 3.11+`
+- `Node.js`
+- настроенный файл `apps/api/.env`
 
-- Full pronunciation scoring by phoneme
-- Progress analytics
-- Billing/subscriptions
-- Teacher memory across many sessions
-- Admin panel
+Минимально важные переменные:
 
-## Project Structure
+- `SALUTE_SPEECH_API_KEY`
+- `OPENROUTER_API_KEY` — желательно для реальных ответов AI
+- `VITE_API_BASE_URL` в `apps/frontend/.env`
 
-- `apps/web` - Next.js frontend
-- `apps/api` - FastAPI backend
-- `docs` - product, architecture, and implementation docs
+Рекомендуемое значение для frontend:
 
-## Working Agreement
-
-`docs/AGENT_GUIDE.md` is the project source of truth for implementation goals.
-
-After each meaningful product or architecture change:
-
-1. Update the relevant code.
-2. Update `docs/AGENT_GUIDE.md`.
-3. Update any detailed doc that changed (`docs/ARCHITECTURE.md`, `docs/API.md`, `docs/ROADMAP.md`).
-
-If code and docs conflict, docs must be corrected in the same change.
-
-## Quick Start
-
-### Frontend
-
-```bash
-cd apps/web
-npm install
-npm run dev
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
 ```
+
+## Локальный запуск
 
 ### Backend
 
-Install Python 3.11+ first, then:
-
-```bash
+```powershell
 cd apps/api
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-copy .env.example .env
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-To enable `SaluteSpeech`, fill `SALUTE_SPEECH_API_KEY` in `apps/api/.env`.
+### Frontend
 
-### Start Both Locally
+```powershell
+cd apps/frontend
+npm install
+npm run dev
+```
+
+После запуска:
+
+- frontend: `http://127.0.0.1:3000`
+- api: `http://127.0.0.1:8000`
+
+## Запуск одной командой
+
+### Для локальной разработки
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1
 ```
 
-Stop them with:
+Остановка:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\stop-local.ps1
 ```
+
+### Для запуска на сервере
+
+Сборка frontend и запуск frontend + backend на внешних интерфейсах:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-server.ps1
+```
+
+Запуск серверного режима с dev-frontend:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-server.ps1 -UseDevFrontend
+```
+
+## Проверка работы
+
+1. Откройте приложение в браузере.
+2. Зарегистрируйтесь или войдите.
+3. Разрешите доступ к микрофону.
+4. Перейдите на экран сессии.
+5. Нажмите и удерживайте кнопку записи.
+6. Скажите фразу на английском.
+7. Отпустите кнопку и дождитесь голосового ответа.
+
+## Примечание
+
+Текущая версия уже использует:
+
+- streaming STT с fallback
+- streaming TTS с fallback
+- `AudioWorklet`
+- `16 kHz PCM16`
+- базовый VAD для улучшения voice UX

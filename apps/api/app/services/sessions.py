@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import AsyncIterator
 
 from app.schemas.session import (
     SessionCreateRequest,
@@ -10,7 +11,11 @@ from app.schemas.session import (
     TutorReplyResponse,
 )
 from app.services.openrouter import OpenRouterClient
-from app.services.speech import SaluteSpeechClient
+from app.services.speech import (
+    SaluteSpeechClient,
+    SpeechRecognitionStreamEvent,
+    SpeechSynthesisStreamResult,
+)
 
 
 class SessionService:
@@ -42,6 +47,20 @@ class SessionService:
         )
         return SpeechToTextResponse(transcript=transcript)
 
+    async def speech_to_text_stream(
+        self,
+        audio_stream: AsyncIterator[bytes],
+        *,
+        sample_rate: int,
+        language: str = "en-US",
+    ) -> AsyncIterator[SpeechRecognitionStreamEvent]:
+        async for event in self.speech_client.transcribe_stream(
+            audio_stream,
+            sample_rate=sample_rate,
+            language=language,
+        ):
+            yield event
+
     async def text_to_speech(self, payload: TextToSpeechRequest) -> TextToSpeechResponse:
         result = await self.speech_client.synthesize(
             payload.text,
@@ -52,4 +71,14 @@ class SessionService:
             audio_base64=result.audio_base64,
             content_type=result.content_type,
             voice=result.voice,
+        )
+
+    async def text_to_speech_stream(
+        self,
+        payload: TextToSpeechRequest,
+    ) -> SpeechSynthesisStreamResult:
+        return await self.speech_client.synthesize_stream(
+            payload.text,
+            voice=payload.voice,
+            language=payload.language,
         )

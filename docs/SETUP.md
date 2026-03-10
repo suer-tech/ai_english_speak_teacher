@@ -24,27 +24,29 @@ No external database is required for the current MVP iteration because the backe
 
 ## Environment Variables
 
-Backend `.env` values are described in `apps/api/.env.example`.
+Backend `.env` values are described in `apps/api/.env`.
 
 Important:
 
 - `SALUTE_SPEECH_API_KEY` must be set for real STT/TTS calls
-- `SALUTE_SPEECH_AUTH_URL`, `SALUTE_SPEECH_SCOPE`, and `SALUTE_SPEECH_DEFAULT_VOICE` are now configurable
+- `SALUTE_SPEECH_AUTH_URL`, `SALUTE_SPEECH_SCOPE`, `SALUTE_SPEECH_DEFAULT_VOICE`, and `SALUTE_SPEECH_GRPC_HOST` are configurable
 
 Frontend:
 
-- `NEXT_PUBLIC_API_BASE_URL`
+- `VITE_API_BASE_URL`
 
 Recommended local value:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
 ```
 
 ## Development Notes
 
 - Start with text-session integration before audio transport
 - Keep `SaluteSpeech` behind a provider interface
+- Frontend capture now assumes a browser with `AudioWorklet` support
+- Frontend normalizes microphone input to mono `16 kHz PCM16` before STT streaming/fallback upload
 - Update this file if provider onboarding changes
 
 ## Local Run
@@ -57,4 +59,5 @@ Project URLs:
 Helper scripts:
 
 - `scripts/start-local.ps1`
+- `scripts/start-server.ps1`
 - `scripts/stop-local.ps1`

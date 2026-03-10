@@ -24,14 +24,20 @@ Hybrid low-cost MVP:
 - mobile speaking UI
 - connect real auth flow from frontend to backend
 
+Status: shipped in current build.
+
 ## Milestone 3
 
 - SaluteSpeech integration
-- audio upload/transcript flow
-- tutor voice playback
+- streaming STT with upload fallback
+- streaming tutor voice playback with legacy fallback
+
+Status: shipped in current build.
 
 ## Milestone 4
 
 - deployment hardening
 - telemetry
 - better error states
+- AudioWorklet capture polish
+- stronger VAD and input-device tuning

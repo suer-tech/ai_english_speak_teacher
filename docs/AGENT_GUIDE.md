@@ -13,7 +13,7 @@ The product must optimize for:
 
 ## Chosen MVP Stack
 
-- Frontend: `Next.js`
+- Frontend: `Vite` (React)
 - Backend: `FastAPI`
 - Database: `SQLite` for MVP, swappable later
 - Tutor brain: `OpenRouter`
@@ -36,8 +36,8 @@ The product must optimize for:
 
 - User opens the speaking screen
 - User grants microphone access
-- User starts speaking
-- App shows transcript and session state
+- User holds the record button to speak
+- App shows voice session state without exposing live transcript text
 - Backend requests tutor reply from OpenRouter
 - App plays tutor response through speech synthesis provider
 - App shows compact Russian feedback
@@ -82,7 +82,7 @@ Each turn should prefer a compact structure:
 
 - SaluteSpeech integration
 - speaking loop
-- transcript and feedback UI
+- voice-state and feedback UI
 
 ### Phase 4
 
@@ -101,12 +101,12 @@ Each turn should prefer a compact structure:
 
 ## Current Implementation Snapshot
 
-- `apps/web` contains a mobile-first landing/session screen
-- tutor settings are persisted locally in browser storage for prototype continuity
+- `apps/frontend` contains the mobile-first UI (Vite)
+- frontend connects to backend auth/settings and stores the bearer token locally
+- speaking flow captures mono `16 kHz PCM16` from the mic through `AudioWorklet`, streams PCM chunks over WebSocket STT during recording, falls back to upload STT when needed, uses lightweight VAD for voice-state feedback, then requests tutor reply, then prefers streaming PCM TTS playback with legacy fallback
 - `apps/api` contains auth, tutor settings, and tutor response route scaffolds
-- frontend supports register/login against backend and stores bearer token locally
 - `OpenRouterClient` includes a fallback path when API keys are not configured
-- `SaluteSpeechClient` now implements token exchange plus sync STT/TTS endpoints
+- `SaluteSpeechClient` now implements token exchange plus dual-path STT (streaming gRPC primary, REST upload fallback) and dual-path TTS (`/tts/stream` primary, `/tts` fallback)
 
 ## Documentation Update Rule
 

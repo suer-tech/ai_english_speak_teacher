@@ -6,12 +6,18 @@ The system is split into a mobile-first frontend and a Python backend.
 
 ### Frontend
 
-- `Next.js` app router
+- `Vite` + React app
 - mobile-first UI
 - auth screens
 - tutor preferences screen
 - speaking session screen
-- browser microphone access
+- hold-to-record microphone access
+- AudioWorklet-based Web Audio PCM capture for STT
+- fixed mono `16 kHz PCM16` capture contract for streaming and fallback STT
+- mic constraints for `noiseSuppression`, `echoCancellation`, and `autoGainControl`
+- lightweight client-side VAD for voice-state updates
+- WebSocket STT chunk streaming during recording
+- streaming PCM playback path for low-latency TTS
 - local fallback state so the prototype remains usable before backend wiring is complete
 
 ### Backend
@@ -33,7 +39,7 @@ Responsible for:
 - tutor setup UX
 - session UI
 - microphone permissions
-- transcript and feedback presentation
+- voice state and feedback presentation
 
 ### API App
 
@@ -64,6 +70,12 @@ Responsible for:
 - speech-to-text interface
 - text-to-speech interface
 - future realtime/streaming hooks
+
+Current speech delivery split:
+
+- STT now prefers a WebSocket -> backend -> SaluteSpeech gRPC streaming path
+- upload-based STT remains as a fallback path
+- TTS now supports a low-latency streaming PCM path plus a legacy base64 fallback path
 
 The initial implementation targets `SaluteSpeech`.
 
