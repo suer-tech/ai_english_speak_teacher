@@ -1,4 +1,5 @@
 # SpeakAI
+<img width="1286" height="935" alt="image" src="https://github.com/user-attachments/assets/c90c737b-1372-4819-a71f-2951b7a797fb" />
 
 Веб-приложение для разговорной практики английского с AI-преподавателем.
 
