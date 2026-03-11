@@ -1,6 +1,5 @@
 import asyncio
 import json
-from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile, WebSocket, status
 from fastapi import WebSocketDisconnect
@@ -21,6 +20,20 @@ from app.services.sessions import SessionService
 
 router = APIRouter()
 session_service = SessionService()
+
+
+class _QueueAudioStream:
+    def __init__(self, queue: asyncio.Queue[bytes | None]) -> None:
+        self._queue = queue
+
+    def __aiter__(self) -> "_QueueAudioStream":
+        return self
+
+    async def __anext__(self) -> bytes:
+        chunk = await self._queue.get()
+        if chunk is None:
+            raise StopAsyncIteration
+        return chunk
 
 
 @router.post("", response_model=SessionCreateResponse)
@@ -89,18 +102,20 @@ async def speech_to_text_stream(websocket: WebSocket):
     language = payload.get("language") or "en-US"
     sample_rate = int(payload.get("sample_rate") or 48000)
     audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+    audio_stream = _QueueAudioStream(audio_queue)
+    stream_closed = False
 
-    async def audio_stream() -> AsyncIterator[bytes]:
-        while True:
-            chunk = await audio_queue.get()
-            if chunk is None:
-                break
-            yield chunk
+    async def close_audio_stream() -> None:
+        nonlocal stream_closed
+        if stream_closed:
+            return
+        stream_closed = True
+        await audio_queue.put(None)
 
     async def send_events() -> None:
         try:
             async for event in session_service.speech_to_text_stream(
-                audio_stream(),
+                audio_stream,
                 sample_rate=sample_rate,
                 language=language,
             ):
@@ -137,15 +152,15 @@ async def speech_to_text_stream(websocket: WebSocket):
                 break
 
             if command.get("type") == "stop":
-                await audio_queue.put(None)
+                await close_audio_stream()
                 break
         await events_task
     except WebSocketDisconnect:
         if not events_task.done():
-            await audio_queue.put(None)
+            await close_audio_stream()
     finally:
         if not events_task.done():
-            await audio_queue.put(None)
+            await close_audio_stream()
             await events_task
 
 

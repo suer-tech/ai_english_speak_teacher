@@ -4,6 +4,7 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from html import escape
+from pathlib import Path
 
 import grpc
 import httpx
@@ -32,6 +33,44 @@ class SpeechRecognitionStreamEvent:
     event_type: str
     transcript: str
     is_final: bool
+
+
+class _RecognitionRequestIterator:
+    def __init__(
+        self,
+        *,
+        recognition_pb2: object,
+        audio_stream: AsyncIterator[bytes],
+        sample_rate: int,
+        language: str,
+    ) -> None:
+        self._recognition_pb2 = recognition_pb2
+        self._audio_stream = audio_stream
+        self._sample_rate = sample_rate
+        self._language = language
+        self._sent_options = False
+
+    def __aiter__(self) -> "_RecognitionRequestIterator":
+        return self
+
+    async def __anext__(self) -> object:
+        if not self._sent_options:
+            self._sent_options = True
+            options = self._recognition_pb2.RecognitionOptions(
+                audio_encoding=self._recognition_pb2.RecognitionOptions.PCM_S16LE,
+                sample_rate=self._sample_rate,
+                language=self._language,
+                hypotheses_count=1,
+                enable_partial_results=True,
+                enable_multi_utterance=False,
+                channels_count=1,
+            )
+            return self._recognition_pb2.RecognitionRequest(options=options)
+
+        while True:
+            chunk = await anext(self._audio_stream)
+            if chunk:
+                return self._recognition_pb2.RecognitionRequest(audio_chunk=chunk)
 
 
 class SaluteSpeechClient:
@@ -75,32 +114,24 @@ class SaluteSpeechClient:
         token = await self._get_access_token()
         recognition_pb2, recognition_pb2_grpc = ensure_salute_proto_modules()
         credentials = grpc.composite_channel_credentials(
-            grpc.ssl_channel_credentials(),
+            grpc.ssl_channel_credentials(
+                root_certificates=self._load_grpc_root_certificates()
+            ),
             grpc.access_token_call_credentials(token),
         )
-
-        async def request_iterator() -> AsyncIterator[object]:
-            options = recognition_pb2.RecognitionOptions(
-                audio_encoding=recognition_pb2.RecognitionOptions.PCM_S16LE,
-                sample_rate=sample_rate,
-                language=language,
-                hypotheses_count=1,
-                enable_partial_results=True,
-                enable_multi_utterance=False,
-                channels_count=1,
-            )
-            yield recognition_pb2.RecognitionRequest(options=options)
-
-            async for chunk in audio_stream:
-                if chunk:
-                    yield recognition_pb2.RecognitionRequest(audio_chunk=chunk)
+        request_iterator = _RecognitionRequestIterator(
+            recognition_pb2=recognition_pb2,
+            audio_stream=audio_stream,
+            sample_rate=sample_rate,
+            language=language,
+        )
 
         async with grpc.aio.secure_channel(
             settings.salute_speech_grpc_host,
             credentials,
         ) as channel:
             stub = recognition_pb2_grpc.SmartSpeechStub(channel)
-            call = stub.Recognize(request_iterator())
+            call = stub.Recognize(request_iterator)
 
             async for response in call:
                 transcript = self._extract_streaming_transcript(response)
@@ -112,6 +143,22 @@ class SaluteSpeechClient:
                     transcript=transcript,
                     is_final=bool(response.eou),
                 )
+
+    def _load_grpc_root_certificates(self) -> bytes | None:
+        cert_path = settings.salute_speech_grpc_ca_cert_path.strip()
+        if not cert_path:
+            return None
+
+        pem_path = Path(cert_path).expanduser()
+        if not pem_path.is_absolute():
+            pem_path = Path.cwd() / pem_path
+
+        try:
+            return pem_path.read_bytes()
+        except OSError as exc:
+            raise ValueError(
+                f"Unable to read SALUTE_SPEECH_GRPC_CA_CERT_PATH at {pem_path}"
+            ) from exc
 
     async def synthesize(
         self,
@@ -270,13 +317,8 @@ class SaluteSpeechClient:
         return f'<speak version="1.0" xml:lang="{language}">{escape(text)}</speak>'
 
     def _resolve_voice(self, *, voice: str | None, language: str) -> str:
-        if voice and "_" in voice:
+        if voice:
             return voice
-
-        if language == "en":
-            return "Kin_24000"
-        if language == "ru":
-            return "Nec_24000"
 
         return settings.salute_speech_default_voice
 

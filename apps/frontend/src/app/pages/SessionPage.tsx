@@ -2,19 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAppContext } from "../context/AppContext";
 import {
-  SpeechToTextStreamClient,
   TutorSettings,
   formatApiError,
   generateTutorReply,
   speechToText,
   textToSpeech,
-  textToSpeechStream,
 } from "../../lib/api";
 import {
   PcmCaptureSession,
   TARGET_SAMPLE_RATE,
 } from "../../lib/audio/pcmCapture";
-import { PcmStreamPlayer } from "../../lib/pcmStreamPlayer";
 import { HoldToTalkButton } from "../components/session/HoldToTalkButton";
 import { SessionIndicator } from "../components/session/SessionIndicator";
 import { VoiceStage } from "../components/session/VoiceStage";
@@ -37,7 +34,7 @@ function formatRecordingDuration(durationMs: number) {
 }
 
 export function SessionPage() {
-  const { settings, theme, token } = useAppContext();
+  const { settings, theme } = useAppContext();
   const navigate = useNavigate();
   const isDark = theme === "dark";
 
@@ -53,15 +50,14 @@ export function SessionPage() {
   const audioPcmChunksRef = useRef<Uint8Array[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
-  const pcmStreamPlayerRef = useRef<PcmStreamPlayer | null>(null);
-  const ttsAbortControllerRef = useRef<AbortController | null>(null);
-  const sttStreamRef = useRef<SpeechToTextStreamClient | null>(null);
   const isPointerHeldRef = useRef(false);
 
+  const defaultVoice =
+    (import.meta.env.VITE_SALUTE_SPEECH_DEFAULT_VOICE as string | undefined) ?? "Kin_24000";
   const activeSettings: TutorSettings = settings ?? {
     persona: "friendly_coach",
     level: "elementary",
-    voice: "Kin_24000",
+    voice: defaultVoice,
     ui_language: "ru",
   };
   const personaTitle = personaTitles[activeSettings.persona] ?? "AI Tutor";
@@ -72,15 +68,30 @@ export function SessionPage() {
       return;
     }
 
-    const updateDuration = () => {
+    let timeoutId: number | null = null;
+    let intervalId: number | null = null;
+
+    const syncDuration = () => {
       setRecordingDurationMs(Date.now() - recordingStartedAt);
     };
 
-    updateDuration();
-    const intervalId = window.setInterval(updateDuration, 100);
+    const startInterval = () => {
+      syncDuration();
+      intervalId = window.setInterval(syncDuration, 1000);
+    };
+
+    syncDuration();
+    timeoutId = window.setTimeout(() => {
+      startInterval();
+    }, 1000 - ((Date.now() - recordingStartedAt) % 1000));
 
     return () => {
-      window.clearInterval(intervalId);
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
     };
   }, [recordingStartedAt, sessionState]);
 
@@ -91,11 +102,6 @@ export function SessionPage() {
   };
 
   const cleanupAudioPlayback = () => {
-    ttsAbortControllerRef.current?.abort();
-    ttsAbortControllerRef.current = null;
-    void pcmStreamPlayerRef.current?.stop();
-    pcmStreamPlayerRef.current = null;
-
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.onended = null;
@@ -107,11 +113,6 @@ export function SessionPage() {
       URL.revokeObjectURL(audioUrlRef.current);
       audioUrlRef.current = null;
     }
-  };
-
-  const cleanupSttStream = () => {
-    sttStreamRef.current?.close();
-    sttStreamRef.current = null;
   };
 
   const buildPcmBlob = () => {
@@ -139,7 +140,7 @@ export function SessionPage() {
     return audioBlob;
   };
 
-  const playLegacyTts = async (text: string, voice: string) => {
+  const playLegacyTts = async (text: string, voice?: string) => {
     setStatusMessage("Загружаю совместимый аудиоответ...");
     const tts = await textToSpeech(text, voice);
     const binaryString = window.atob(tts.audio_base64);
@@ -166,61 +167,11 @@ export function SessionPage() {
     await audio.play();
   };
 
-  const playTutorReply = async (text: string, voice: string) => {
-    cleanupAudioPlayback();
-
-    let streamingStarted = false;
-
-    try {
-      const abortController = new AbortController();
-      ttsAbortControllerRef.current = abortController;
-      setSessionState("buffering");
-      setStatusMessage("Буферизую аудиоответ...");
-
-      const streamed = await textToSpeechStream(text, voice, abortController.signal);
-      const player = new PcmStreamPlayer(streamed.sampleRate, {
-        onPlaybackStart: () => {
-          streamingStarted = true;
-          setSessionState("playing");
-          setStatusMessage("Слушайте ответ.");
-        },
-      });
-
-      pcmStreamPlayerRef.current = player;
-      await player.play(streamed.stream, abortController.signal);
-
-      if (pcmStreamPlayerRef.current === player) {
-        pcmStreamPlayerRef.current = null;
-      }
-      if (ttsAbortControllerRef.current === abortController) {
-        ttsAbortControllerRef.current = null;
-      }
-
-      setSessionState("idle");
-      setStatusMessage("Можно говорить снова.");
-      return;
-    } catch (error) {
-      const isAbortError =
-        error instanceof DOMException && error.name === "AbortError";
-
-      if (pcmStreamPlayerRef.current) {
-        void pcmStreamPlayerRef.current.stop();
-        pcmStreamPlayerRef.current = null;
-      }
-      ttsAbortControllerRef.current = null;
-
-      if (isAbortError) {
-        throw error;
-      }
-
-      if (streamingStarted) {
-        throw error;
-      }
-    }
-
+  const playTutorReply = async (text: string, voice?: string) => {
     cleanupAudioPlayback();
     await playLegacyTts(text, voice);
   };
+
 
   const handlePointerDown = async () => {
     if (sessionState !== "idle") {
@@ -232,17 +183,6 @@ export function SessionPage() {
     setStatusMessage("Слушаю вас. Отпустите кнопку, когда закончите.");
 
     try {
-      if (!token) {
-        throw new Error("Authentication required");
-      }
-
-      const sttStream = new SpeechToTextStreamClient({
-        token,
-        language: "en-US",
-        sampleRate: TARGET_SAMPLE_RATE,
-      });
-      await sttStream.connect();
-      sttStreamRef.current = sttStream;
 
       const pcmCapture = new PcmCaptureSession({
         onPcmChunk: (chunk) => {
@@ -251,7 +191,6 @@ export function SessionPage() {
           }
 
           audioPcmChunksRef.current.push(chunk);
-          sttStreamRef.current?.sendAudioChunk(chunk);
         },
         onSpeechActivityChange: (isSpeechActive) => {
           if (!isPointerHeldRef.current) {
@@ -271,7 +210,6 @@ export function SessionPage() {
         await pcmCapture.stop();
         pcmCaptureRef.current = null;
         clearRecordingSession();
-        cleanupSttStream();
         setSessionState("idle");
         setStatusMessage("Удерживайте кнопку и говорите, когда будете готовы.");
         return;
@@ -287,7 +225,6 @@ export function SessionPage() {
       await pcmCaptureRef.current?.stop();
       pcmCaptureRef.current = null;
       clearRecordingSession();
-      cleanupSttStream();
       setStatusMessage(formatApiError(error, "Нет доступа к микрофону"));
       setSessionState("idle");
     }
@@ -308,25 +245,13 @@ export function SessionPage() {
     setStatusMessage("Завершаю распознавание речи...");
 
     try {
-      const sttStream = sttStreamRef.current;
-      sttStreamRef.current = null;
       const audioBlob = await finalizeRecording();
       if (!audioBlob || audioBlob.size === 0) {
-        cleanupSttStream();
         setSessionState("idle");
         setStatusMessage("Не удалось записать аудио. Попробуйте еще раз.");
         return;
       }
-
-      let recognizedText = "";
-      try {
-        if (!sttStream) {
-          throw new Error("Streaming speech recognition is unavailable");
-        }
-        recognizedText = (await sttStream.finish()).trim();
-      } catch {
-        recognizedText = (await speechToText(audioBlob, "en-US", TARGET_SAMPLE_RATE)).trim();
-      }
+      const recognizedText = (await speechToText(audioBlob, "en-US", TARGET_SAMPLE_RATE)).trim();
 
       if (!recognizedText) {
         setSessionState("idle");
@@ -340,7 +265,6 @@ export function SessionPage() {
       await playTutorReply(reply.tutor_reply, activeSettings.voice);
     } catch (error) {
       clearRecordingSession();
-      stopMediaStream();
       cleanupAudioPlayback();
       setStatusMessage(formatApiError(error, "Ошибка обработки речи"));
       setSessionState("idle");
@@ -357,7 +281,6 @@ export function SessionPage() {
     await pcmCaptureRef.current?.stop();
     pcmCaptureRef.current = null;
     clearRecordingSession();
-    cleanupSttStream();
     setSessionState("idle");
     setStatusMessage("Запись отменена. Удерживайте кнопку, чтобы попробовать еще раз.");
   };
@@ -365,7 +288,6 @@ export function SessionPage() {
   useEffect(() => {
     return () => {
       cleanupAudioPlayback();
-      cleanupSttStream();
       void pcmCaptureRef.current?.stop();
       pcmCaptureRef.current = null;
       isPointerHeldRef.current = false;

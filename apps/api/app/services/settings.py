@@ -1,15 +1,22 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings as app_settings
 from app.models.user import TutorSettings
 from app.schemas.settings import TutorSettingsPayload, TutorSettingsResponse
 
 
 class TutorSettingsService:
-    def get_by_user_id(self, db: Session, user_id: int) -> TutorSettingsResponse | None:
+    def get_by_user_id(self, db: Session, user_id: int) -> TutorSettingsResponse:
         settings = db.scalar(select(TutorSettings).where(TutorSettings.user_id == user_id))
         if not settings:
-            return None
+            return TutorSettingsResponse(
+                id=None,
+                persona="friendly_coach",
+                level="elementary",
+                voice=app_settings.salute_speech_default_voice,
+                ui_language="ru",
+            )
         return TutorSettingsResponse(
             id=settings.id,
             persona=settings.persona,

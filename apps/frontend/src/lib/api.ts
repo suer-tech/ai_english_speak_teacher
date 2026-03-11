@@ -34,8 +34,8 @@ type SpeechToTextStreamEvent =
   | { type: "final_transcript"; transcript: string }
   | { type: "error"; message: string };
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
+const API_BASE_URL = `${window.location.origin}/api/v1`;
+
 
 function buildWebSocketUrl(path: string, params: Record<string, string>) {
   const url = new URL(API_BASE_URL);
@@ -298,10 +298,18 @@ export async function generateTutorReply(text: string, settings: TutorSettings) 
   });
 }
 
-export async function textToSpeech(text: string, voice: string) {
+export async function textToSpeech(text: string, voice?: string) {
+  const body: { text: string; voice?: string; language: "en" } = {
+    text,
+    language: "en",
+  };
+  if (voice) {
+    body.voice = voice;
+  }
+
   return apiRequest<TextToSpeechResponse>("/sessions/tts", {
     method: "POST",
-    body: { text, voice, language: "en" },
+    body,
   });
 }
 

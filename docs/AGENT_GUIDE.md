@@ -103,10 +103,11 @@ Each turn should prefer a compact structure:
 
 - `apps/frontend` contains the mobile-first UI (Vite)
 - frontend connects to backend auth/settings and stores the bearer token locally
-- speaking flow captures mono `16 kHz PCM16` from the mic through `AudioWorklet`, streams PCM chunks over WebSocket STT during recording, falls back to upload STT when needed, uses lightweight VAD for voice-state feedback, then requests tutor reply, then prefers streaming PCM TTS playback with legacy fallback
+- speaking flow captures mono PCM16 from the mic, uploads `audio/x-pcm;bit=16;rate=...` to STT, requests tutor reply, then plays TTS (non-streaming)
 - `apps/api` contains auth, tutor settings, and tutor response route scaffolds
-- `OpenRouterClient` includes a fallback path when API keys are not configured
-- `SaluteSpeechClient` now implements token exchange plus dual-path STT (streaming gRPC primary, REST upload fallback) and dual-path TTS (`/tts/stream` primary, `/tts` fallback)
+- `OpenRouterClient` requires a valid API key; invalid responses trigger a single retry and then error
+- `SaluteSpeechClient` implements token exchange plus REST STT/TTS for the MVP
+- TTS defaults to `SALUTE_SPEECH_DEFAULT_VOICE` when `voice` is not provided
 
 ## Documentation Update Rule
 

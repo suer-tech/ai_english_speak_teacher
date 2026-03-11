@@ -5,6 +5,41 @@
 }
 
 @layer utilities {
+  @keyframes playback-wave {
+    0% {
+      height: var(--playback-idle);
+      opacity: 0.34;
+      transform: scaleY(0.92);
+    }
+    25% {
+      height: var(--playback-peak);
+      opacity: 1;
+      transform: scaleY(1);
+    }
+    50% {
+      height: var(--playback-settle);
+      opacity: 0.72;
+      transform: scaleY(0.96);
+    }
+    75% {
+      height: var(--playback-peak-soft);
+      opacity: 1;
+      transform: scaleY(1);
+    }
+    100% {
+      height: var(--playback-idle);
+      opacity: 0.4;
+      transform: scaleY(0.92);
+    }
+  }
+
+  .playback-bar {
+    animation-name: playback-wave;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    transform-origin: bottom center;
+  }
+
   .hide-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;

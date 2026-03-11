@@ -1,7 +1,9 @@
+import { memo } from "react";
 import { motion } from "motion/react";
 import { Settings2, Sparkles } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { useAppContext } from "../../context/AppContext";
+import { useIsMobile } from "../../../hooks/useIsMobile";
 import type { SessionState } from "./types";
 
 const statusLabels: Record<SessionState, string> = {
@@ -26,19 +28,21 @@ interface SessionIndicatorProps {
   onOpenSettings: () => void;
 }
 
-export function SessionIndicator({
+export const SessionIndicator = memo(function SessionIndicator({
   personaTitle,
   sessionState,
   onOpenSettings,
 }: SessionIndicatorProps) {
   const { theme } = useAppContext();
   const isDark = theme === "dark";
+  const isMobile = useIsMobile();
 
   return (
     <header className="relative z-10 flex items-center justify-between px-6 pt-6">
       <div
         className={cn(
-          "flex items-center gap-3 rounded-full px-4 py-3 backdrop-blur-xl",
+          "flex items-center gap-3 rounded-full px-4 py-3",
+          isMobile ? "" : "backdrop-blur-xl",
           isDark ? "border border-white/10 bg-white/[0.04]" : "border border-slate-200 bg-white/75",
         )}
       >
@@ -48,23 +52,32 @@ export function SessionIndicator({
             isDark ? "border border-white/10 bg-white/[0.06]" : "border border-slate-200 bg-slate-100/90",
           )}
         >
-          <motion.div
-            className={cn(
-              "absolute inset-1 rounded-full blur-md",
-              isDark ? "bg-indigo-400/20" : "bg-indigo-300/40",
-            )}
-            animate={{
-              scale:
-                sessionState === "idle"
-                  ? [1, 1.08, 1]
-                  : sessionState === "recording"
-                  ? [1, 1.18, 1]
-                  : sessionState === "processing"
-                  ? [1, 1.12, 1]
-                  : [1, 1.22, 1],
-            }}
-            transition={{ repeat: Infinity, duration: 2.6, ease: "easeInOut" }}
-          />
+          {isMobile ? (
+            <div
+              className={cn(
+                "absolute inset-1 rounded-full",
+                isDark ? "bg-indigo-400/20" : "bg-indigo-300/40",
+              )}
+            />
+          ) : (
+            <motion.div
+              className={cn(
+                "absolute inset-1 rounded-full blur-md",
+                isDark ? "bg-indigo-400/20" : "bg-indigo-300/40",
+              )}
+              animate={{
+                scale:
+                  sessionState === "idle"
+                    ? [1, 1.08, 1]
+                    : sessionState === "recording"
+                    ? [1, 1.18, 1]
+                    : sessionState === "processing"
+                    ? [1, 1.12, 1]
+                    : [1, 1.22, 1],
+              }}
+              transition={{ repeat: Infinity, duration: 2.6, ease: "easeInOut" }}
+            />
+          )}
           <Sparkles className={cn("relative z-10 h-5 w-5", isDark ? "text-indigo-300" : "text-indigo-600")} />
         </div>
 
@@ -88,7 +101,8 @@ export function SessionIndicator({
         type="button"
         onClick={onOpenSettings}
         className={cn(
-          "flex h-12 w-12 items-center justify-center rounded-full backdrop-blur-xl transition",
+          "flex h-12 w-12 items-center justify-center rounded-full transition",
+          !isMobile && "backdrop-blur-xl",
           isDark
             ? "border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08] hover:text-white"
             : "border border-slate-200 bg-white/75 text-slate-500 hover:bg-white hover:text-slate-900",
@@ -99,4 +113,4 @@ export function SessionIndicator({
       </button>
     </header>
   );
-}
+});

@@ -1,3 +1,4 @@
+import json
 from textwrap import dedent
 
 import httpx
@@ -14,33 +15,25 @@ class OpenRouterClient:
         self, payload: TutorReplyRequest
     ) -> TutorReplyResponse:
         if not settings.openrouter_api_key:
-            return self._fallback_reply(payload)
+            raise ValueError("OPENROUTER_API_KEY is not configured")
 
         system_prompt = dedent(
             f"""
-            You are an English speaking tutor inside a language learning app.
-            Always answer in a structured JSON-like way internally, but return only clean final fields.
-            The learner UI language is Russian.
-            Persona: {payload.settings.persona}
-            Level: {payload.settings.level}
-
-            Goals:
-            - encourage speaking confidence
-            - correct only the most important issue
-            - provide a short pronunciation hint when possible
-            - reply as a tutor so the conversation continues
+            You are an experienced English teacher at level {payload.settings.level}. Your goal is to help the user build their English speaking skills through natural dialogue.
+            RULES:
+            Always respond ONLY in English, even if the user writes in another language.
+            Ask open-ended questions.
+            Maintain the topic for 3-4 messages.
+            Use vocabulary and grammar at level {payload.settings.level} (A1-C2).
+            Explain new words in English using simple synonyms, without translations.
+            Persona: {payload.settings.persona}.
+            Output must be a single valid JSON object and nothing else. Do not wrap in code fences. Do not add extra keys. Do not add commentary.
             """
         ).strip()
 
         user_prompt = dedent(
             f"""
-            Learner message: {payload.text}
-
-            Return:
-            - corrected_text
-            - key_feedback
-            - pronunciation_tip
-            - tutor_reply
+            Learner: {payload.text}
             """
         ).strip()
 
@@ -75,6 +68,21 @@ class OpenRouterClient:
             },
         }
 
+        last_error: Exception | None = None
+        for attempt in range(2):
+            try:
+                content = await self._call_openrouter(request_body)
+                parsed = self._parse_json_response(content)
+                return TutorReplyResponse(**parsed)
+            except Exception as exc:
+                last_error = exc
+                if attempt == 0:
+                    continue
+                raise
+
+        raise ValueError("OpenRouter response could not be parsed") from last_error
+
+    async def _call_openrouter(self, request_body: dict) -> str:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
                 self.base_url,
@@ -85,29 +93,7 @@ class OpenRouterClient:
                 json=request_body,
             )
             response.raise_for_status()
-            content = response.json()["choices"][0]["message"]["content"]
+            return response.json()["choices"][0]["message"]["content"]
 
-        import json
-
-        parsed = json.loads(content)
-        return TutorReplyResponse(**parsed)
-
-    def _fallback_reply(self, payload: TutorReplyRequest) -> TutorReplyResponse:
-        text = payload.text.strip()
-        corrected_text = (
-            "Hello, I want to practice English for travel and daily conversations."
-            if text
-            else "Hello, I want to practice my English."
-        )
-        return TutorReplyResponse(
-            corrected_text=corrected_text,
-            key_feedback=(
-                "Исправляем только главную ошибку: после 'want' в этом контексте нужен 'to'."
-            ),
-            pronunciation_tip=(
-                "Скажи 'practice' медленнее и четко выдели первый слог: PRAC-tice."
-            ),
-            tutor_reply=(
-                "Nice start. Tell me where you want to travel and what situations in English worry you most."
-            ),
-        )
+    def _parse_json_response(self, content: str) -> dict:
+        return json.loads(content)

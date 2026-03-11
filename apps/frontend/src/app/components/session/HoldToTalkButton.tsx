@@ -1,7 +1,12 @@
-import type { PointerEvent as ReactPointerEvent } from "react";
+import {
+  memo,
+  type PointerEvent as ReactPointerEvent,
+  type TouchEvent as ReactTouchEvent,
+} from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Mic } from "lucide-react";
 import { cn } from "../../../lib/utils";
+import { useIsMobile } from "../../../hooks/useIsMobile";
 import type { SessionState } from "./types";
 
 interface HoldToTalkButtonProps {
@@ -21,7 +26,7 @@ const helperText: Record<SessionState, string> = {
   playing: "AI отвечает",
 };
 
-export function HoldToTalkButton({
+export const HoldToTalkButton = memo(function HoldToTalkButton({
   sessionState,
   isPressed,
   onPointerDown,
@@ -29,52 +34,96 @@ export function HoldToTalkButton({
   onPointerCancel,
   onPointerLeave,
 }: HoldToTalkButtonProps) {
+  const isMobile = useIsMobile();
+  const supportsPointerEvents =
+    typeof window !== "undefined" && "PointerEvent" in window;
   const isBusy =
     sessionState === "processing" || sessionState === "buffering" || sessionState === "playing";
   const showPressedState = isPressed || sessionState === "recording";
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (isBusy) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
     void onPointerDown();
   };
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
     void onPointerUp();
   };
 
   const handlePointerCancel = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    void onPointerCancel();
+  };
+
+  const handleMouseDown = () => {
+    if (supportsPointerEvents || isBusy) return;
+    void onPointerDown();
+  };
+
+  const handleMouseUp = () => {
+    if (supportsPointerEvents) return;
+    void onPointerUp();
+  };
+
+  const handleTouchStart = (event: ReactTouchEvent<HTMLButtonElement>) => {
+    if (supportsPointerEvents || isBusy) return;
+    event.preventDefault();
+    void onPointerDown();
+  };
+
+  const handleTouchEnd = (event: ReactTouchEvent<HTMLButtonElement>) => {
+    if (supportsPointerEvents) return;
+    event.preventDefault();
+    void onPointerUp();
+  };
+
+  const handleTouchCancel = (event: ReactTouchEvent<HTMLButtonElement>) => {
+    if (supportsPointerEvents) return;
+    event.preventDefault();
     void onPointerCancel();
   };
 
   return (
     <div className="relative z-10 flex flex-col items-center px-6 pb-6 pt-6">
       <div className="relative flex h-24 items-center justify-center">
-        <AnimatePresence>
-          {showPressedState ? (
-            <>
-              <motion.div
-                initial={{ opacity: 0.4, scale: 1 }}
-                animate={{ opacity: 0, scale: 2 }}
-                exit={{ opacity: 0 }}
-                transition={{ repeat: Infinity, duration: 1.5, ease: "easeOut" }}
-                className="absolute h-20 w-20 rounded-full bg-rose-500"
-              />
-              <motion.div
-                initial={{ opacity: 0.5, scale: 1 }}
-                animate={{ opacity: 0, scale: 2.5 }}
-                exit={{ opacity: 0 }}
-                transition={{ repeat: Infinity, duration: 1.5, delay: 0.4, ease: "easeOut" }}
-                className="absolute h-20 w-20 rounded-full bg-rose-500/50"
-              />
-            </>
-          ) : null}
-        </AnimatePresence>
+        {!isMobile && (
+          <AnimatePresence>
+            {showPressedState ? (
+              <>
+                <motion.div
+                  initial={{ opacity: 0.4, scale: 1 }}
+                  animate={{ opacity: 0, scale: 2 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ repeat: Infinity, duration: 1.5, ease: "easeOut" }}
+                  className="absolute h-20 w-20 rounded-full bg-rose-500"
+                />
+                <motion.div
+                  initial={{ opacity: 0.5, scale: 1 }}
+                  animate={{ opacity: 0, scale: 2.5 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ repeat: Infinity, duration: 1.5, delay: 0.4, ease: "easeOut" }}
+                  className="absolute h-20 w-20 rounded-full bg-rose-500/50"
+                />
+              </>
+            ) : null}
+          </AnimatePresence>
+        )}
 
         <motion.button
           type="button"
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerCancel}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchCancel}
           onPointerLeave={() => void onPointerLeave?.()}
           onContextMenu={(event) => event.preventDefault()}
           disabled={isBusy}
@@ -136,4 +185,4 @@ export function HoldToTalkButton({
       </motion.p>
     </div>
   );
-}
+});

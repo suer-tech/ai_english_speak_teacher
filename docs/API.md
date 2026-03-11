@@ -60,6 +60,10 @@ Notes:
 
 Accepts text payload and returns base64-encoded audio from `SaluteSpeech`.
 
+Notes:
+
+- `voice` is optional; when omitted the backend uses `SALUTE_SPEECH_DEFAULT_VOICE`.
+
 ### `POST /api/v1/sessions/tts/stream`
 
 Accepts the same text payload as `/tts` and streams binary PCM audio from `SaluteSpeech`.

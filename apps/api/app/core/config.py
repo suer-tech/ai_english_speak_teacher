@@ -25,7 +25,8 @@ class Settings(BaseSettings):
     salute_speech_scope: str = "SALUTE_SPEECH_PERS"
     salute_speech_base_url: str = "https://smartspeech.sber.ru/rest/v1"
     salute_speech_grpc_host: str = "smartspeech.sber.ru"
-    salute_speech_default_voice: str = "Kin_24000"
+    salute_speech_grpc_ca_cert_path: str = ""
+    salute_speech_default_voice: str = "Bys_8000"
 
 
 @lru_cache

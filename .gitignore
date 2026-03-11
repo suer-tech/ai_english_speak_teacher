@@ -23,6 +23,8 @@ venv/
 env/
 .env.local/
 tools/python311/
+.pem
+*.pem
 
 # Environment files
 .env

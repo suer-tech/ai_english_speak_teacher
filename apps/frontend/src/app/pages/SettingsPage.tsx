@@ -19,6 +19,11 @@ const LEVELS: { id: EnglishLevel; label: string }[] = [
   { id: "intermediate", label: "Средний (B1+)" },
 ];
 
+const VOICES: { id: string; label: string; desc: string }[] = [
+  { id: "Kin_24000", label: "Кира", desc: "Kin_24000" },
+  { id: "Pon_24000", label: "Сергей", desc: "Pon_24000" },
+];
+
 export function SettingsPage() {
   const { saveSettings, settings, theme, toggleTheme } = useAppContext();
   const navigate = useNavigate();
@@ -26,7 +31,9 @@ export function SettingsPage() {
 
   const [persona, setPersona] = useState<TutorPersona>(settings?.persona || "friendly_coach");
   const [level, setLevel] = useState<EnglishLevel>(settings?.level || "elementary");
-  const [voice] = useState(settings?.voice || "Kin_24000");
+  const defaultVoice =
+    (import.meta.env.VITE_SALUTE_SPEECH_DEFAULT_VOICE as string | undefined) ?? "Kin_24000";
+  const [voice, setVoice] = useState(settings?.voice || defaultVoice);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -35,7 +42,8 @@ export function SettingsPage() {
     }
     setPersona(settings.persona);
     setLevel(settings.level);
-  }, [settings]);
+    setVoice(settings.voice || defaultVoice);
+  }, [settings, defaultVoice]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -136,6 +144,54 @@ export function SettingsPage() {
 
                   <div className={cn("shrink-0 ml-4 self-center transition-all duration-300", isSelected ? "opacity-100 scale-100 text-indigo-400" : "opacity-0 scale-50")}>
                     <Check className="w-5 h-5" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </motion.section>
+
+        <motion.section
+          initial={false}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          className="space-y-4"
+        >
+          <h2 className={cn("text-[13px] font-medium uppercase tracking-wider mb-3 ml-1", isDark ? "text-zinc-500" : "text-slate-500")}>
+            Голос преподавателя
+          </h2>
+          <div className={cn("flex flex-col gap-2 p-1 rounded-2xl relative", isDark ? "bg-white/[0.02] border border-white/[0.08]" : "bg-white/80 border border-slate-200")}>
+            {VOICES.map((v) => {
+              const isSelected = voice === v.id;
+              return (
+                <button
+                  key={v.id}
+                  onClick={() => setVoice(v.id)}
+                  className="relative px-4 py-3.5 text-left text-[15px] font-medium rounded-xl transition-colors duration-200 z-10 group"
+                >
+                  {isSelected && (
+                    <motion.div
+                      layoutId="activeVoice"
+                      className={cn(
+                        "absolute inset-0 rounded-xl shadow-sm",
+                        isDark ? "bg-white/10 border border-white/10" : "bg-slate-100 border border-slate-200",
+                      )}
+                      initial={false}
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    />
+                  )}
+                  <div className="relative z-10 flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className={isSelected ? (isDark ? "text-white" : "text-slate-900") : isDark ? "text-zinc-400 group-hover:text-zinc-300 transition-colors" : "text-slate-500 group-hover:text-slate-700 transition-colors"}>
+                        {v.label}
+                      </span>
+                      <span className={cn("text-[11px] mt-0.5", isDark ? "text-zinc-500" : "text-slate-400")}>
+                        {v.desc}
+                      </span>
+                    </div>
+                    {isSelected && (
+                      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.8)]" />
+                    )}
                   </div>
                 </button>
               );
