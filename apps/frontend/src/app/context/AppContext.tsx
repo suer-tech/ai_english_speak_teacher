@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import {
   TutorSettings,
   fetchTutorSettings,
@@ -88,8 +88,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setSettings(remote);
           localStorage.setItem("tutor_settings", JSON.stringify(remote));
         }
-      } catch {
-        // Keep local settings if backend is unavailable.
+      } catch (err: unknown) {
+        const e = err as Error & { status?: number };
+        if (e.status === 401) {
+          setToken(null);
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("tutor_settings");
+          setSettings(null);
+        }
+        // Keep local settings for other errors (backend unavailable, etc.)
       } finally {
         if (!cancelled) {
           setIsBootstrapping(false);

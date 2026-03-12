@@ -6,6 +6,15 @@ from app.models.user import TutorSettings
 from app.schemas.settings import TutorSettingsPayload, TutorSettingsResponse
 
 
+def _normalize_voice(voice: str | None) -> str:
+    """Normalize stored voice to internal female/male."""
+    if voice in ("female", "male"):
+        return voice
+    if voice and "Pon" in voice:
+        return "male"
+    return "female"
+
+
 class TutorSettingsService:
     def get_by_user_id(self, db: Session, user_id: int) -> TutorSettingsResponse:
         settings = db.scalar(select(TutorSettings).where(TutorSettings.user_id == user_id))
@@ -14,13 +23,13 @@ class TutorSettingsService:
                 id=None,
                 persona="friendly_coach",
                 level="elementary",
-                voice=app_settings.salute_speech_default_voice,
+                voice="female",
                 ui_language="ru",
             )
         return TutorSettingsResponse(
             id=settings.id,
             persona=settings.persona,
-            voice=settings.voice,
+            voice=_normalize_voice(settings.voice),
             level=settings.level,
             ui_language=settings.ui_language,
         )
@@ -44,7 +53,7 @@ class TutorSettingsService:
         return TutorSettingsResponse(
             id=settings.id,
             persona=settings.persona,
-            voice=settings.voice,
+            voice=_normalize_voice(settings.voice),
             level=settings.level,
             ui_language=settings.ui_language,
         )

@@ -1,6 +1,5 @@
-import type { CSSProperties } from "react";
+import React from "react";
 import { motion } from "motion/react";
-import { useIsMobile } from "../../../hooks/useIsMobile";
 
 const playbackBars = [
   { idle: 24, peak: 54, settle: 30, duration: 0.82, delay: 0 },
@@ -15,50 +14,30 @@ const playbackBars = [
 ];
 
 export function PlaybackVisualizer() {
-  const isMobile = useIsMobile();
-
   return (
     <div className="flex h-36 items-end justify-center gap-2" aria-hidden="true">
-      {playbackBars.map((bar, index) =>
-        isMobile ? (
-          <span
-            key={index}
-            className="playback-bar rounded-full bg-gradient-to-t from-white/40 via-white/85 to-white shadow-[0_0_18px_rgba(129,140,248,0.38)]"
-            style={
-              {
-                width: index % 2 === 0 ? 8 : 6,
-                height: bar.idle,
-                animationDuration: `${bar.duration}s`,
-                animationDelay: `${bar.delay}s`,
-                ["--playback-idle" as string]: `${bar.idle}px`,
-                ["--playback-peak" as string]: `${bar.peak}px`,
-                ["--playback-settle" as string]: `${bar.settle}px`,
-                ["--playback-peak-soft" as string]: `${bar.peak - 18}px`,
-              } as CSSProperties
-            }
-          />
-        ) : (
-          <motion.span
-            key={index}
-            className="rounded-full bg-gradient-to-t from-white/40 via-white/85 to-white shadow-[0_0_18px_rgba(129,140,248,0.38)]"
-            animate={{
-              height: [bar.idle, bar.peak, bar.settle, bar.peak - 18, bar.idle],
-              opacity: [0.34, 1, 0.72, 1, 0.4],
-              scaleY: [0.92, 1, 0.96, 1, 0.92],
-            }}
-            transition={{
-              repeat: Infinity,
-              duration: bar.duration,
-              ease: "easeInOut",
-              delay: bar.delay,
-            }}
-            style={{
-              width: index % 2 === 0 ? 8 : 6,
-              transformOrigin: "bottom center",
-            }}
-          />
-        ),
-      )}
+      {playbackBars.map((bar, index) => (
+        <motion.span
+          key={index}
+          className="rounded-full bg-gradient-to-t from-white/40 via-white/85 to-white shadow-[0_0_18px_rgba(129,140,248,0.38)]"
+          animate={{
+            height: [bar.idle, bar.peak, bar.settle, bar.peak - 18, bar.idle],
+            opacity: [0.34, 1, 0.72, 1, 0.4],
+            scaleY: [0.92, 1, 0.96, 1, 0.92],
+          }}
+          transition={{
+            repeat: Infinity,
+            duration: bar.duration,
+            ease: "easeInOut",
+            delay: bar.delay,
+          }}
+          style={{
+            width: index % 2 === 0 ? 8 : 6,
+            transformOrigin: "bottom center",
+            willChange: "transform, opacity",
+          }}
+        />
+      ))}
     </div>
   );
 }

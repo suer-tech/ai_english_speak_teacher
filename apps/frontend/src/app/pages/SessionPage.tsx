@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAppContext } from "../context/AppContext";
 import {
@@ -52,12 +52,10 @@ export function SessionPage() {
   const audioUrlRef = useRef<string | null>(null);
   const isPointerHeldRef = useRef(false);
 
-  const defaultVoice =
-    (import.meta.env.VITE_SALUTE_SPEECH_DEFAULT_VOICE as string | undefined) ?? "Kin_24000";
   const activeSettings: TutorSettings = settings ?? {
     persona: "friendly_coach",
     level: "elementary",
-    voice: defaultVoice,
+    voice: "female",
     ui_language: "ru",
   };
   const personaTitle = personaTitles[activeSettings.persona] ?? "AI Tutor";
@@ -121,7 +119,7 @@ export function SessionPage() {
       return null;
     }
 
-    return new Blob(chunks, {
+    return new Blob(chunks as BlobPart[], {
       type: `audio/x-pcm;bit=16;rate=${TARGET_SAMPLE_RATE}`,
     });
   };

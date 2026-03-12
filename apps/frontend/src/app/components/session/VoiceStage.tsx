@@ -1,3 +1,4 @@
+import React from "react";
 import { motion } from "motion/react";
 import { Sparkles, Waves } from "lucide-react";
 import { cn } from "../../../lib/utils";
@@ -207,32 +208,22 @@ export function VoiceStage({
             ) : sessionState === "processing" || sessionState === "buffering" ? (
               <div className="flex flex-col items-center gap-3">
                 <div className="flex gap-2" aria-hidden="true">
-                  {[0, 1, 2].map((index) =>
-                    isMobile ? (
-                      <span
-                        key={index}
-                        className={cn(
-                          "h-3 w-3 rounded-full",
-                          sessionState === "buffering" ? "bg-sky-200/90" : "bg-white/80",
-                        )}
-                      />
-                    ) : (
-                      <motion.span
-                        key={index}
-                        className={cn(
-                          "h-3 w-3 rounded-full",
-                          sessionState === "buffering" ? "bg-sky-200/90" : "bg-white/80",
-                        )}
-                        animate={{ y: [0, -8, 0], opacity: [0.35, 1, 0.35] }}
-                        transition={{
-                          repeat: Infinity,
-                          duration: 0.75,
-                          delay: index * 0.14,
-                          ease: "easeInOut",
-                        }}
-                      />
-                    ),
-                  )}
+                  {[0, 1, 2].map((index) => (
+                    <motion.span
+                      key={index}
+                      className={cn(
+                        "h-3 w-3 rounded-full",
+                        sessionState === "buffering" ? "bg-sky-200/90" : "bg-white/80",
+                      )}
+                      animate={{ y: [0, -8, 0], opacity: [0.35, 1, 0.35] }}
+                      transition={{
+                        repeat: Infinity,
+                        duration: 0.75,
+                        delay: index * 0.14,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  ))}
                 </div>
               </div>
             ) : (
@@ -495,14 +486,6 @@ export function VoiceStage({
           <h1 className={cn("text-[2rem] font-semibold leading-tight", isDark ? "text-white" : "text-slate-900")}>
             {copy.title}
           </h1>
-          <p className={cn("text-sm leading-6", isDark ? "text-zinc-400" : "text-slate-600")}>
-            {sessionState === "recording" ? recordingDurationLabel : statusMessage}
-          </p>
-          {copy.hint ? (
-            <p className={cn("text-sm leading-6", isDark ? "text-zinc-500" : "text-slate-500")}>
-              {copy.hint}
-            </p>
-          ) : null}
         </div>
       </div>
     </section>

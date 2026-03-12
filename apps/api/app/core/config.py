@@ -4,7 +4,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     app_name: str = "SpeakAI API"
     app_env: str = "development"
@@ -27,6 +31,10 @@ class Settings(BaseSettings):
     salute_speech_grpc_host: str = "smartspeech.sber.ru"
     salute_speech_grpc_ca_cert_path: str = ""
     salute_speech_default_voice: str = "Bys_8000"
+
+    tts_provider: str = "salute_speech"
+    tts_voice_female: str = "Kin_24000"
+    tts_voice_male: str = "Pon_24000"
 
 
 @lru_cache

@@ -1,5 +1,18 @@
 @custom-variant dark (&:is(.dark *));
 
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+#root {
+  height: 100%;
+  min-height: 100svh;
+  min-height: var(--vh, 100vh);
+}
+
 :root {
   --font-size: 16px;
   --background: #ffffff;

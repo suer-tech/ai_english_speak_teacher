@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile, WebSocket, status
 from fastapi import WebSocketDisconnect
@@ -169,6 +170,7 @@ async def text_to_speech(payload: TextToSpeechRequest):
     try:
         return await session_service.text_to_speech(payload)
     except Exception as exc:
+        logging.getLogger(__name__).exception("TTS failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),

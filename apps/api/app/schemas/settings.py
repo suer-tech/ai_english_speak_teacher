@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class TutorSettingsPayload(BaseModel):
     persona: Literal["friendly_coach", "strict_teacher", "conversation_buddy"]
-    voice: str
+    voice: Literal["female", "male"]
     level: Literal["beginner", "elementary", "intermediate"]
     ui_language: Literal["ru"] = "ru"
 

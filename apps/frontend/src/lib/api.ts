@@ -56,9 +56,8 @@ type RequestOptions = Omit<RequestInit, "body" | "headers"> & {
 
 async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { body, token, ...rest } = options;
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(rest.headers ?? {}),
   };
 
   if (token) {
@@ -86,7 +85,9 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
     } catch {
       // ignore JSON parsing errors
     }
-    throw new Error(message);
+    const err = new Error(message) as Error & { status?: number };
+    err.status = response.status;
+    throw err;
   }
 
   return (await response.json()) as T;

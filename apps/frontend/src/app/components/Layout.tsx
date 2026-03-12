@@ -1,3 +1,4 @@
+import React from "react";
 import { Outlet, Navigate, useLocation } from "react-router";
 import { useAppContext } from "../context/AppContext";
 import { Toaster } from "sonner";
@@ -12,7 +13,7 @@ export function RootLayout() {
   if (isBootstrapping) {
     return (
       <div
-        className={`min-h-screen w-full font-sans flex items-center justify-center ${
+        className={`h-[100svh] h-[var(--vh,100vh)] w-full font-sans flex items-center justify-center ${
           isDark ? "bg-[#0F0F13] text-zinc-100" : "bg-slate-100 text-slate-900"
         }`}
       >
@@ -35,7 +36,7 @@ export function RootLayout() {
 
   return (
     <div
-      className={`min-h-screen w-full font-sans selection:bg-indigo-500/30 overflow-hidden relative flex flex-col items-center justify-center ${
+      className={`h-[100svh] h-[var(--vh,100vh)] w-full font-sans selection:bg-indigo-500/30 overflow-hidden relative flex flex-col items-center justify-center ${
         isDark ? "bg-[#0F0F13] text-zinc-100" : "bg-slate-100 text-slate-900"
       }`}
     >
@@ -52,7 +53,7 @@ export function RootLayout() {
       />
       
       <div
-        className={`w-full max-w-md h-full min-h-[100dvh] flex flex-col relative z-10 backdrop-blur-3xl shadow-2xl overflow-y-auto hide-scrollbar ${
+        className={`w-full max-w-md h-full min-h-0 flex flex-col relative z-10 backdrop-blur-3xl shadow-2xl overflow-y-auto hide-scrollbar ${
           isDark
             ? "sm:border-x sm:border-white/[0.04] bg-[#0F0F13]/50"
             : "sm:border-x sm:border-slate-200/80 bg-white/75"

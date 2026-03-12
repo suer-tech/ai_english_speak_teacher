@@ -1,4 +1,7 @@
 import base64
+import json
+import logging
+import struct
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -11,6 +14,43 @@ import httpx
 
 from app.core.config import settings
 from app.services.salute_proto import ensure_salute_proto_modules
+
+logger = logging.getLogger(__name__)
+
+
+def _pcm16_to_wav(pcm_data: bytes, sample_rate: int) -> bytes:
+    """Wrap raw PCM 16-bit mono into a WAV file."""
+    num_samples = len(pcm_data) // 2
+    data_size = num_samples * 2
+    header_size = 44
+    file_size = header_size + data_size
+
+    header = struct.pack(
+        "<4sI4s4sIHHIIHH4sI",
+        b"RIFF",
+        file_size - 8,
+        b"WAVE",
+        b"fmt ",
+        16,
+        1,
+        1,
+        sample_rate,
+        sample_rate * 2,
+        2,
+        16,
+        b"data",
+        data_size,
+    )
+    return header + pcm_data
+
+
+def resolve_tts_voice(voice: str | None) -> str:
+    """Map internal voice (female/male) to provider-specific voice from env."""
+    if voice == "female":
+        return settings.tts_voice_female
+    if voice == "male":
+        return settings.tts_voice_male
+    return settings.tts_voice_female
 
 
 @dataclass
@@ -317,13 +357,163 @@ class SaluteSpeechClient:
         return f'<speak version="1.0" xml:lang="{language}">{escape(text)}</speak>'
 
     def _resolve_voice(self, *, voice: str | None, language: str) -> str:
-        if voice:
-            return voice
-
-        return settings.salute_speech_default_voice
+        return resolve_tts_voice(voice)
 
     def _resolve_sample_rate(self, voice: str) -> int:
         try:
             return int(voice.rsplit("_", 1)[1])
         except (IndexError, ValueError):
             return 24000
+
+
+class GPTAudioMiniClient:
+    """TTS via OpenRouter GPT Audio Mini (openai/gpt-audio-mini)."""
+
+    def __init__(self) -> None:
+        self.provider_name = "gpt_audio_mini"
+        self._base_url = "https://openrouter.ai/api/v1/chat/completions"
+        self._sample_rate = 24000
+
+    async def synthesize(
+        self,
+        text: str,
+        *,
+        voice: str | None = None,
+        language: str = "en",
+    ) -> SpeechSynthesisResult:
+        provider_voice = resolve_tts_voice(voice)
+        pcm_b64 = await self._request_audio(text, provider_voice)
+        wav_bytes = _pcm16_to_wav(base64.b64decode(pcm_b64), self._sample_rate)
+        return SpeechSynthesisResult(
+            audio_base64=base64.b64encode(wav_bytes).decode("ascii"),
+            content_type="audio/wav",
+            voice=provider_voice,
+        )
+
+    async def synthesize_stream(
+        self,
+        text: str,
+        *,
+        voice: str | None = None,
+        language: str = "en",
+    ) -> SpeechSynthesisStreamResult:
+        provider_voice = resolve_tts_voice(voice)
+        content_type = f"audio/x-pcm;bit=16;rate={self._sample_rate}"
+
+        async def audio_stream() -> AsyncIterator[bytes]:
+            async for chunk in self._stream_audio(text, provider_voice):
+                yield chunk
+
+        return SpeechSynthesisStreamResult(
+            audio_stream=audio_stream(),
+            content_type=content_type,
+            voice=provider_voice,
+            sample_rate=self._sample_rate,
+        )
+
+    async def _request_audio(self, text: str, voice: str) -> str:
+        if not settings.openrouter_api_key:
+            raise ValueError("OPENROUTER_API_KEY is not configured for TTS")
+
+        payload = {
+            "model": "openai/gpt-audio-mini",
+            "messages": [{"role": "user", "content": text}],
+            "modalities": ["text", "audio"],
+            "audio": {"voice": voice, "format": "pcm16"},
+            "stream": True,
+        }
+
+        chunks_b64: list[str] = []
+        async with httpx.AsyncClient(timeout=90) as client:
+            async with client.stream(
+                "POST",
+                self._base_url,
+                headers={
+                    "Authorization": f"Bearer {settings.openrouter_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            ) as response:
+                if response.is_error:
+                    body = await response.aread()
+                    err_msg = f"GPT Audio Mini TTS error {response.status_code}: {body.decode('utf-8', errors='replace')}"
+                    logger.error(err_msg)
+                    raise ValueError(err_msg)
+                async for line in response.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data = line[6:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        obj = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = obj.get("choices") or []
+                    if not choices:
+                        err = obj.get("error", {})
+                        if err:
+                            logger.warning("OpenRouter chunk error: %s", err)
+                        continue
+                    delta = choices[0].get("delta", {})
+                    audio = delta.get("audio", {})
+                    if audio.get("data"):
+                        chunks_b64.append(audio["data"])
+
+        full_b64 = "".join(chunks_b64)
+        if not full_b64:
+            raise ValueError(
+                "GPT Audio Mini returned no audio. Check model supports modalities=['text','audio'] and format."
+            )
+        return full_b64
+
+    async def _stream_audio(
+        self, text: str, voice: str
+    ) -> AsyncIterator[bytes]:
+        if not settings.openrouter_api_key:
+            raise ValueError("OPENROUTER_API_KEY is not configured for TTS")
+
+        payload = {
+            "model": "openai/gpt-audio-mini",
+            "messages": [{"role": "user", "content": text}],
+            "modalities": ["text", "audio"],
+            "audio": {"voice": voice, "format": "pcm16"},
+            "stream": True,
+        }
+
+        async with httpx.AsyncClient(timeout=90) as client:
+            async with client.stream(
+                "POST",
+                self._base_url,
+                headers={
+                    "Authorization": f"Bearer {settings.openrouter_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            ) as response:
+                if response.is_error:
+                    body = await response.aread()
+                    raise ValueError(
+                        f"GPT Audio Mini TTS error {response.status_code}: {body.decode('utf-8', errors='replace')}"
+                    )
+                async for line in response.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data = line[6:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        obj = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    delta = (obj.get("choices") or [{}])[0].get("delta", {})
+                    audio = delta.get("audio", {})
+                    if audio.get("data"):
+                        yield base64.b64decode(audio["data"])
+
+
+def get_tts_client() -> SaluteSpeechClient | GPTAudioMiniClient:
+    """Return TTS client based on TTS_PROVIDER env."""
+    if settings.tts_provider.strip().lower() == "gpt_audio_mini":
+        return GPTAudioMiniClient()
+    return SaluteSpeechClient()

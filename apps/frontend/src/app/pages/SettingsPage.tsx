@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+/// <reference types="vite/client" />
+import React, { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { Smile, BookOpen, MessageCircle, ChevronRight, Check, Moon, Sun } from "lucide-react";
 import { useAppContext } from "../context/AppContext";
@@ -19,21 +20,21 @@ const LEVELS: { id: EnglishLevel; label: string }[] = [
   { id: "intermediate", label: "Средний (B1+)" },
 ];
 
-const VOICES: { id: string; label: string; desc: string }[] = [
-  { id: "Kin_24000", label: "Кира", desc: "Kin_24000" },
-  { id: "Pon_24000", label: "Сергей", desc: "Pon_24000" },
+const VOICES: { id: "female" | "male"; label: string }[] = [
+  { id: "female", label: "Женский голос" },
+  { id: "male", label: "Мужской голос" },
 ];
 
 export function SettingsPage() {
-  const { saveSettings, settings, theme, toggleTheme } = useAppContext();
+  const { saveSettings, settings, theme, toggleTheme, logout } = useAppContext();
   const navigate = useNavigate();
   const isDark = theme === "dark";
 
   const [persona, setPersona] = useState<TutorPersona>(settings?.persona || "friendly_coach");
   const [level, setLevel] = useState<EnglishLevel>(settings?.level || "elementary");
-  const defaultVoice =
-    (import.meta.env.VITE_SALUTE_SPEECH_DEFAULT_VOICE as string | undefined) ?? "Kin_24000";
-  const [voice, setVoice] = useState(settings?.voice || defaultVoice);
+  const [voice, setVoice] = useState<"female" | "male">(
+    (settings?.voice as "female" | "male") || "female",
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -42,8 +43,8 @@ export function SettingsPage() {
     }
     setPersona(settings.persona);
     setLevel(settings.level);
-    setVoice(settings.voice || defaultVoice);
-  }, [settings, defaultVoice]);
+    setVoice((settings.voice as "female" | "male") || "female");
+  }, [settings]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -52,6 +53,12 @@ export function SettingsPage() {
       toast.success("Настройки сохранены");
       navigate("/session");
     } catch (error) {
+      const err = error as Error & { status?: number };
+      if (err.status === 401) {
+        logout();
+        toast.error("Сессия истекла. Войдите снова.");
+        return;
+      }
       toast.error(formatApiError(error, "Не удалось сохранить настройки"));
     } finally {
       setIsSaving(false);
@@ -181,14 +188,9 @@ export function SettingsPage() {
                     />
                   )}
                   <div className="relative z-10 flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <span className={isSelected ? (isDark ? "text-white" : "text-slate-900") : isDark ? "text-zinc-400 group-hover:text-zinc-300 transition-colors" : "text-slate-500 group-hover:text-slate-700 transition-colors"}>
-                        {v.label}
-                      </span>
-                      <span className={cn("text-[11px] mt-0.5", isDark ? "text-zinc-500" : "text-slate-400")}>
-                        {v.desc}
-                      </span>
-                    </div>
+                    <span className={isSelected ? (isDark ? "text-white" : "text-slate-900") : isDark ? "text-zinc-400 group-hover:text-zinc-300 transition-colors" : "text-slate-500 group-hover:text-slate-700 transition-colors"}>
+                      {v.label}
+                    </span>
                     {isSelected && (
                       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.8)]" />
                     )}
@@ -248,10 +250,7 @@ export function SettingsPage() {
         initial={false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        className={cn(
-          "mt-10 pb-8 sticky bottom-0 pt-8",
-          isDark ? "bg-gradient-to-t from-[#0F0F13] via-[#0F0F13]/80 to-transparent" : "bg-gradient-to-t from-slate-50 via-slate-50/80 to-transparent",
-        )}
+        className="mt-10 pb-8 pt-8"
       >
         <button
           onClick={handleSave}
