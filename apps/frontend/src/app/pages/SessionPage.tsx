@@ -3,7 +3,10 @@ import { useNavigate } from "react-router";
 import { useAppContext } from "../context/AppContext";
 import {
   TutorSettings,
+  audioRespond,
+  createSession,
   formatApiError,
+  fetchSessionConfig,
   generateTutorReply,
   speechToText,
   textToSpeech,
@@ -51,6 +54,8 @@ export function SessionPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const isPointerHeldRef = useRef(false);
+  const [useDirectAudio, setUseDirectAudio] = useState(false);
+  const [directAudioSessionId, setDirectAudioSessionId] = useState<string | null>(null);
 
   const activeSettings: TutorSettings = settings ?? {
     persona: "friendly_coach",
@@ -240,7 +245,7 @@ export function SessionPage() {
     }
 
     setSessionState("processing");
-    setStatusMessage("Завершаю распознавание речи...");
+    setStatusMessage(useDirectAudio ? "Формирую голосовой ответ..." : "Завершаю распознавание речи...");
 
     try {
       const audioBlob = await finalizeRecording();
@@ -249,18 +254,51 @@ export function SessionPage() {
         setStatusMessage("Не удалось записать аудио. Попробуйте еще раз.");
         return;
       }
-      const recognizedText = (await speechToText(audioBlob, "en-US", TARGET_SAMPLE_RATE)).trim();
 
-      if (!recognizedText) {
-        setSessionState("idle");
-        setStatusMessage("Не удалось распознать речь. Попробуйте еще раз.");
-        return;
+      if (useDirectAudio) {
+        if (!directAudioSessionId) {
+          setSessionState("idle");
+          setStatusMessage("Сессия не создана. Обновите страницу.");
+          return;
+        }
+        setStatusMessage("AI слушает и отвечает...");
+        const tts = await audioRespond(
+          audioBlob,
+          directAudioSessionId,
+          activeSettings,
+          TARGET_SAMPLE_RATE,
+        );
+        const binaryString = window.atob(tts.audio_base64);
+        const bytes = Uint8Array.from(binaryString, (char) => char.charCodeAt(0));
+        const blob = new Blob([bytes], { type: tts.content_type });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audioUrlRef.current = url;
+        audio.onended = () => {
+          cleanupAudioPlayback();
+          setSessionState("idle");
+          setStatusMessage("Можно говорить снова.");
+        };
+        audio.onerror = () => {
+          cleanupAudioPlayback();
+          setSessionState("idle");
+          setStatusMessage("Не удалось воспроизвести аудио.");
+        };
+        setSessionState("playing");
+        setStatusMessage("Слушайте ответ.");
+        await audio.play();
+      } else {
+        const recognizedText = (await speechToText(audioBlob, "en-US", TARGET_SAMPLE_RATE)).trim();
+        if (!recognizedText) {
+          setSessionState("idle");
+          setStatusMessage("Не удалось распознать речь. Попробуйте еще раз.");
+          return;
+        }
+        setStatusMessage("Формирую ответ...");
+        const reply = await generateTutorReply(recognizedText, activeSettings);
+        await playTutorReply(reply.tutor_reply, activeSettings.voice);
       }
-
-      setStatusMessage("Формирую ответ...");
-      const reply = await generateTutorReply(recognizedText, activeSettings);
-
-      await playTutorReply(reply.tutor_reply, activeSettings.voice);
     } catch (error) {
       clearRecordingSession();
       cleanupAudioPlayback();
@@ -282,6 +320,20 @@ export function SessionPage() {
     setSessionState("idle");
     setStatusMessage("Запись отменена. Удерживайте кнопку, чтобы попробовать еще раз.");
   };
+
+  useEffect(() => {
+    fetchSessionConfig().then(async (config) => {
+      setUseDirectAudio(config.use_direct_audio);
+      if (config.use_direct_audio) {
+        try {
+          const session = await createSession();
+          setDirectAudioSessionId(session.session_id);
+        } catch {
+          setDirectAudioSessionId(null);
+        }
+      }
+    });
+  }, []);
 
   useEffect(() => {
     return () => {

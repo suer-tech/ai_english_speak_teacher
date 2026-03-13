@@ -75,7 +75,9 @@ Current speech delivery:
 - STT uses REST upload (`audio/x-pcm;bit=16;rate=...`)
 - TTS uses REST base64 audio responses
 
-The initial implementation targets `SaluteSpeech`.
+Providers: `SaluteSpeech` (default), `GPTAudioMiniClient` when `TTS_PROVIDER=gpt_audio_mini`.
+
+In GPT Audio Mini mode: user audio → SaluteSpeech (transcription for history) → GPT Audio Mini (audio response with conversation context). History (last 3 user + 3 assistant) stored in memory per session.
 
 ## Data Model
 

@@ -19,6 +19,14 @@ export interface TextToSpeechResponse {
   audio_base64: string;
   content_type: string;
   voice: string;
+  assistant_text?: string;
+  user_transcript?: string;
+}
+
+export interface SessionCreateResponse {
+  session_id: string;
+  mode: string;
+  status: string;
 }
 
 export interface StreamingTextToSpeechResponse {
@@ -257,6 +265,55 @@ export async function saveTutorSettings(token: string, settings: TutorSettings) 
     token,
     body: settings,
   });
+}
+
+export async function fetchSessionConfig(): Promise<{ use_direct_audio: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/sessions/config`);
+  if (!response.ok) {
+    return { use_direct_audio: false };
+  }
+  return response.json();
+}
+
+export async function createSession(): Promise<SessionCreateResponse> {
+  return apiRequest<SessionCreateResponse>("/sessions", {
+    method: "POST",
+    body: { mode: "speaking" },
+  });
+}
+
+export async function audioRespond(
+  audio: Blob,
+  sessionId: string,
+  settings: { persona: string; level: string; voice: string },
+  sampleRate: number,
+): Promise<TextToSpeechResponse> {
+  const formData = new FormData();
+  formData.append("audio", audio, "speech.pcm");
+  const query = new URLSearchParams({
+    session_id: sessionId,
+    sample_rate: sampleRate.toString(),
+    persona: settings.persona,
+    level: settings.level,
+    voice: settings.voice,
+  });
+  const response = await fetch(`${API_BASE_URL}/sessions/audio-respond?${query}`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) {
+    let message = "Audio respond failed";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload?.detail) {
+        message = payload.detail;
+      }
+    } catch {
+      // ignore
+    }
+    throw new Error(message);
+  }
+  return response.json();
 }
 
 export async function speechToText(audio: Blob, language = "en-US", sampleRate?: number) {

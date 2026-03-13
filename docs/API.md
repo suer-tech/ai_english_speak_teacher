@@ -28,9 +28,22 @@ Create or update tutor settings.
 
 ## Sessions
 
+### `GET /api/v1/sessions/config`
+
+Return config for session flow (e.g. `use_direct_audio` when `TTS_PROVIDER=gpt_audio_mini`).
+
 ### `POST /api/v1/sessions`
 
-Create a speaking session.
+Create a speaking session. Returns `session_id` used for `audio-respond` when in direct audio mode.
+
+### `POST /api/v1/sessions/audio-respond`
+
+Direct audio-to-audio via GPT Audio Mini. Only when `TTS_PROVIDER=gpt_audio_mini`.
+
+- multipart form-data: `audio` (PCM16)
+- query: `session_id` (required), `sample_rate`, `persona`, `level`, `voice`
+- response: base64 audio, `assistant_text`, `user_transcript`
+- maintains conversation history (last 3 user + 3 assistant) in memory per session
 
 ### `POST /api/v1/sessions/respond`
 

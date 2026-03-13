@@ -8,7 +8,7 @@
 Приложение позволяет:
 
 - зарегистрироваться и войти в аккаунт
-- выбрать голос и мнеру общения преподавателя
+- выбрать голос и манеру общения преподавателя
 - выбрать свой уровень владения языком
 - говорить и получать голосовой ответ от AI
 
@@ -19,6 +19,12 @@
 - `SQLite` — локальная база
 - `SaluteSpeech` — распознавание и синтез речи
 - `OpenRouter` — генерация ответов преподавателя
+
+### Режимы работы
+
+1. **SaluteSpeech + OpenRouter** (по умолчанию): STT → LLM → TTS. Распознавание речи через SaluteSpeech, ответ формирует OpenRouter, озвучка через SaluteSpeech.
+
+2. **GPT Audio Mini** (`TTS_PROVIDER=gpt_audio_mini`): прямой аудио-в-аудио. Пользовательское аудио отправляется в `openai/gpt-audio-mini`, модель отвечает голосом. Транскрипция через SaluteSpeech нужна для хранения истории диалога (последние 3 сообщения пользователя и 3 ответа ИИ).
 
 ## Структура проекта
 
@@ -35,9 +41,13 @@
 
 Минимально важные переменные:
 
-- `SALUTE_SPEECH_API_KEY`
-- `OPENROUTER_API_KEY` — желательно для реальных ответов AI
+- `SALUTE_SPEECH_API_KEY` — для распознавания речи (и транскрипции в режиме GPT Audio Mini)
+- `OPENROUTER_API_KEY` — для ответов AI (LLM и/или GPT Audio Mini)
 - `VITE_API_BASE_URL` в `apps/frontend/.env`
+
+Для режима GPT Audio Mini (прямой аудио-в-аудио):
+
+- `TTS_PROVIDER=gpt_audio_mini` — включить режим
 
 Рекомендуемое значение для frontend:
 
@@ -117,3 +127,4 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-server.ps1 -UseDevFront
 - `AudioWorklet`
 - `16 kHz PCM16`
 - базовый VAD для улучшения voice UX
+- в режиме GPT Audio Mini — история диалога (6 последних сообщений) в памяти для контекста

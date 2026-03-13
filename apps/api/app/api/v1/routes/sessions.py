@@ -17,6 +17,7 @@ from app.schemas.session import (
     TutorReplyResponse,
 )
 from app.services.sessions import SessionService
+from app.services.speech import is_direct_audio_mode
 
 
 router = APIRouter()
@@ -37,6 +38,12 @@ class _QueueAudioStream:
         return chunk
 
 
+@router.get("/config")
+def get_session_config():
+    """Return config for session flow (e.g. whether to use direct audio)."""
+    return {"use_direct_audio": is_direct_audio_mode()}
+
+
 @router.post("", response_model=SessionCreateResponse)
 def create_session(payload: SessionCreateRequest):
     return session_service.create_session(payload)
@@ -45,6 +52,34 @@ def create_session(payload: SessionCreateRequest):
 @router.post("/respond", response_model=TutorReplyResponse)
 async def respond(payload: TutorReplyRequest):
     return await session_service.respond(payload)
+
+
+@router.post("/audio-respond", response_model=TextToSpeechResponse)
+async def audio_respond(
+    audio: UploadFile = File(...),
+    session_id: str = Query(...),
+    sample_rate: int = Query(default=16000),
+    persona: str = Query(default="friendly_coach"),
+    level: str = Query(default="elementary"),
+    voice: str = Query(default="female"),
+):
+    """Direct audio-to-audio with conversation history. Only when TTS_PROVIDER=gpt_audio_mini."""
+    try:
+        audio_bytes = await audio.read()
+        return await session_service.audio_respond(
+            audio_bytes,
+            session_id=session_id,
+            sample_rate=sample_rate,
+            persona=persona,
+            level=level,
+            voice=voice,
+        )
+    except Exception as exc:
+        logging.getLogger(__name__).exception("audio_respond failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
 
 
 @router.post("/stt", response_model=SpeechToTextResponse)

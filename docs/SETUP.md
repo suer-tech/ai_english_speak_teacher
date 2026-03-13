@@ -30,6 +30,8 @@ Important:
 
 - `SALUTE_SPEECH_API_KEY` must be set for real STT/TTS calls
 - `SALUTE_SPEECH_AUTH_URL`, `SALUTE_SPEECH_SCOPE`, `SALUTE_SPEECH_DEFAULT_VOICE`, and `SALUTE_SPEECH_GRPC_HOST` are configurable
+- `OPENROUTER_API_KEY` — for LLM and/or GPT Audio Mini
+- `TTS_PROVIDER=gpt_audio_mini` — enable direct audio-to-audio mode (GPT Audio Mini with conversation history)
 
 Frontend:
 

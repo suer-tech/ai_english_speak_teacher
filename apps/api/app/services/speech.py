@@ -61,6 +61,15 @@ class SpeechSynthesisResult:
 
 
 @dataclass
+class AudioRespondResult:
+    audio_base64: str
+    content_type: str
+    voice: str
+    assistant_text: str
+    user_transcript: str
+
+
+@dataclass
 class SpeechSynthesisStreamResult:
     audio_stream: AsyncIterator[bytes]
     content_type: str
@@ -390,6 +399,109 @@ class GPTAudioMiniClient:
             voice=provider_voice,
         )
 
+    async def audio_respond(
+        self,
+        pcm_bytes: bytes,
+        *,
+        sample_rate: int = 16000,
+        persona: str = "friendly_coach",
+        level: str = "elementary",
+        voice: str | None = None,
+        user_text: str = "",
+        history: list[dict] | None = None,
+    ) -> AudioRespondResult:
+        """Send user audio to GPT Audio Mini with conversation history, get spoken response."""
+        provider_voice = resolve_tts_voice(voice)
+        wav_bytes = _pcm16_to_wav(pcm_bytes, sample_rate)
+        audio_b64 = base64.b64encode(wav_bytes).decode("ascii")
+
+        persona_hint = "Supportive and encouraging, explain calmly."
+
+        system_prompt = (
+            f"You are an experienced English teacher at level {level}. "
+            "Listen to the learner's speech and respond in spoken English only. "
+            f"Persona: {persona_hint} "
+            "Ask open-ended questions. Use vocabulary at the learner's level. "
+            "Respond naturally as if in a voice conversation."
+        )
+
+        history_messages = (history or [])[-6:]
+        user_content: list[dict] = [
+            {"type": "text", "text": user_text or "Listen to the learner and respond in spoken English."},
+            {"type": "input_audio", "input_audio": {"data": audio_b64, "format": "wav"}},
+        ]
+
+        messages: list[dict] = [
+            {"role": "system", "content": system_prompt},
+            *history_messages,
+            {"role": "user", "content": user_content},
+        ]
+
+        payload = {
+            "model": "openai/gpt-audio-mini",
+            "messages": messages,
+            "modalities": ["text", "audio"],
+            "audio": {"voice": provider_voice, "format": "pcm16"},
+            "stream": True,
+        }
+
+        if not settings.openrouter_api_key:
+            raise ValueError("OPENROUTER_API_KEY is not configured for TTS")
+
+        chunks_b64: list[str] = []
+        transcript_parts: list[str] = []
+        async with httpx.AsyncClient(timeout=120) as client:
+            async with client.stream(
+                "POST",
+                self._base_url,
+                headers={
+                    "Authorization": f"Bearer {settings.openrouter_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            ) as response:
+                if response.is_error:
+                    body = await response.aread()
+                    err_msg = f"GPT Audio Mini audio-respond error {response.status_code}: {body.decode('utf-8', errors='replace')}"
+                    logger.error(err_msg)
+                    raise ValueError(err_msg)
+                async for line in response.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data = line[6:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        obj = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = obj.get("choices") or []
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta", {})
+                    content = delta.get("content")
+                    if content:
+                        transcript_parts.append(content)
+                    audio = delta.get("audio", {})
+                    if audio.get("data"):
+                        chunks_b64.append(audio["data"])
+                    if audio.get("transcript"):
+                        transcript_parts.append(audio["transcript"])
+
+        full_b64 = "".join(chunks_b64)
+        if not full_b64:
+            raise ValueError("GPT Audio Mini returned no audio for audio-respond.")
+        pcm_out = base64.b64decode(full_b64)
+        wav_out = _pcm16_to_wav(pcm_out, self._sample_rate)
+        assistant_text = "".join(transcript_parts).strip()
+        return AudioRespondResult(
+            audio_base64=base64.b64encode(wav_out).decode("ascii"),
+            content_type="audio/wav",
+            voice=provider_voice,
+            assistant_text=assistant_text,
+            user_transcript=user_text,
+        )
+
     async def synthesize_stream(
         self,
         text: str,
@@ -517,3 +629,8 @@ def get_tts_client() -> SaluteSpeechClient | GPTAudioMiniClient:
     if settings.tts_provider.strip().lower() == "gpt_audio_mini":
         return GPTAudioMiniClient()
     return SaluteSpeechClient()
+
+
+def is_direct_audio_mode() -> bool:
+    """True when TTS_PROVIDER=gpt_audio_mini (audio-to-audio without STT)."""
+    return settings.tts_provider.strip().lower() == "gpt_audio_mini"
