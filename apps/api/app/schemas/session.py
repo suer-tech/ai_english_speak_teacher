@@ -43,5 +43,3 @@ class TextToSpeechResponse(BaseModel):
     content_type: str
     voice: str
     provider: str = "salute_speech"
-    assistant_text: str | None = None
-    user_transcript: str | None = None

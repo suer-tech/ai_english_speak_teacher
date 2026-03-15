@@ -10,7 +10,7 @@ router = APIRouter()
 settings_service = TutorSettingsService()
 
 
-@router.get("/tutor", response_model=TutorSettingsResponse)
+@router.get("/tutor", response_model=TutorSettingsResponse | None)
 def get_tutor_settings(
     user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_database_session),

@@ -57,13 +57,13 @@ async def respond(payload: TutorReplyRequest):
 @router.post("/audio-respond", response_model=TextToSpeechResponse)
 async def audio_respond(
     audio: UploadFile = File(...),
-    session_id: str = Query(...),
+    session_id: str = Query(..., description="Session ID for conversation history"),
     sample_rate: int = Query(default=16000),
     persona: str = Query(default="friendly_coach"),
     level: str = Query(default="elementary"),
     voice: str = Query(default="female"),
 ):
-    """Direct audio-to-audio with conversation history. Only when TTS_PROVIDER=gpt_audio_mini."""
+    """Direct audio-to-audio. Only when TTS_PROVIDER=gpt_audio_mini."""
     try:
         audio_bytes = await audio.read()
         return await session_service.audio_respond(

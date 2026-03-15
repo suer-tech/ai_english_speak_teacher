@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { RouterProvider } from "react-router";
 import { router } from "./routes";
 import { AppProvider } from "./context/AppContext";
